@@ -1774,6 +1774,127 @@
         "dataCount": 11,
         "confidence": "medium"
       }
+    },
+    {
+      "pasaran": "SGP",
+      "date": "2025-11-01T14:22:05.738Z",
+      "prediction": {
+        "ai": [
+          1,
+          2,
+          4,
+          5,
+          6
+        ],
+        "kepala": [
+          8,
+          6,
+          1,
+          0
+        ],
+        "ekor": [
+          1,
+          8,
+          2,
+          4
+        ],
+        "as": [
+          5,
+          8,
+          2
+        ],
+        "kop": [
+          0,
+          2,
+          8
+        ],
+        "bbfs": "0124568",
+        "combinations4D": [
+          "5081",
+          "5088",
+          "5061",
+          "5068",
+          "5281",
+          "5288",
+          "5261",
+          "5268",
+          "5881",
+          "5888"
+        ],
+        "formulas": {
+          "Mistik": "5962",
+          "ML": "5437",
+          "IX": "9871",
+          "M1": "7659",
+          "M3": "8760",
+          "M5": "0982",
+          "M7": "1093",
+          "TY": "5673"
+        },
+        "hotCold": {
+          "hot": [
+            "3",
+            "8",
+            "1",
+            "5",
+            "6"
+          ],
+          "cold": [
+            "9",
+            "7",
+            "4",
+            "0",
+            "2"
+          ],
+          "frequency": {
+            "0": 2,
+            "1": 6,
+            "2": 3,
+            "3": 8,
+            "4": 2,
+            "5": 6,
+            "6": 6,
+            "7": 2,
+            "8": 8,
+            "9": 1
+          }
+        },
+        "pattern": {
+          "ganjilGenap": {
+            "ganjil": 4,
+            "genap": 6
+          },
+          "besarKecil": {
+            "besar": 6,
+            "kecil": 4
+          }
+        },
+        "trends": {
+          "as": {
+            "trend": "stable",
+            "direction": 0,
+            "confidence": 0.5
+          },
+          "kop": {
+            "trend": "stable",
+            "direction": 0,
+            "confidence": 0.5
+          },
+          "kepala": {
+            "trend": "increasing",
+            "direction": 1,
+            "confidence": 0.75
+          },
+          "ekor": {
+            "trend": "stable",
+            "direction": 0,
+            "confidence": 0.5
+          }
+        },
+        "lastResult": "4326",
+        "dataCount": 11,
+        "confidence": "medium"
+      }
     }
   ],
   "predictionTracking": [
@@ -2422,6 +2543,56 @@
           "5209",
           "5491",
           "5499"
+        ]
+      },
+      "actual": null,
+      "verified": false
+    },
+    {
+      "pasaran": "SGP",
+      "date": "2025-11-01T14:22:05.738Z",
+      "prediction": {
+        "ai": [
+          1,
+          2,
+          4,
+          5,
+          6
+        ],
+        "kepala": [
+          8,
+          6,
+          1,
+          0
+        ],
+        "ekor": [
+          1,
+          8,
+          2,
+          4
+        ],
+        "as": [
+          5,
+          8,
+          2
+        ],
+        "kop": [
+          0,
+          2,
+          8
+        ],
+        "bbfs": "0124568",
+        "combinations4D": [
+          "5081",
+          "5088",
+          "5061",
+          "5068",
+          "5281",
+          "5288",
+          "5261",
+          "5268",
+          "5881",
+          "5888"
         ]
       },
       "actual": null,
