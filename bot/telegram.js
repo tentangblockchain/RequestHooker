@@ -73,12 +73,14 @@ class TelegramBotHandler {
       const msg = query.message;
       const chatId = msg.chat.id;
 
-      // Answer callback query immediately to remove loading state
-      await this.bot.answerCallbackQuery(query.id).catch(err => {
-        console.error('Error answering callback:', err.message);
-      });
-
       try {
+        // Answer callback query FIRST before doing anything else
+        await this.bot.answerCallbackQuery(query.id, {
+          text: '⏳ Memproses...'
+        }).catch(err => {
+          console.error('Error answering callback:', err.message);
+        });
+
         if (data.startsWith('pred_')) {
           const pasaran = data.split('_')[1];
           this.generatePrediksi(chatId, pasaran);
@@ -142,6 +144,13 @@ class TelegramBotHandler {
       } catch (error) {
         console.error('❌ Callback error:', error.message);
         console.error('Stack:', error.stack);
+        
+        // Try to answer callback even on error
+        await this.bot.answerCallbackQuery(query.id, {
+          text: '❌ Error',
+          show_alert: false
+        }).catch(() => {});
+        
         await this.bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.').catch(() => {});
       }
     });
