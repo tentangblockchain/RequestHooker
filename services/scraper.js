@@ -2,11 +2,6 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
-const { wrapper } = require('axios-cookiejar-support');
-const { CookieJar } = require('tough-cookie');
-
-const jar = new CookieJar();
-const client = wrapper(axios.create({ jar }));
 
 class ScraperService {
   static getConfig() {
@@ -25,90 +20,25 @@ class ScraperService {
 
   static async scrapeTogelData(url, pasaran) {
     try {
-      const baseUrl = new URL(url).origin;
-      const listPage = `${baseUrl}/wap/pasaran.html`;
+      console.log(`   📍 Scraping ${url}...`);
       
-      // Step 1: Visit homepage first
-      console.log(`   📍 Step 1: Visiting ${baseUrl}...`);
-      await client.get(baseUrl, {
-        timeout: 20000,
+      const response = await axios.get(url, {
+        timeout: 15000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Accept-Encoding': 'gzip, deflate, br, zstd',
-          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1',
-          'Cache-Control': 'max-age=0'
-        },
-        maxRedirects: 5,
-        validateStatus: () => true
-      }).catch(() => null);
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Step 2: Visit pasaran list
-      console.log(`   📍 Step 2: Visiting pasaran list...`);
-      await client.get(listPage, {
-        timeout: 20000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Accept-Encoding': 'gzip, deflate, br, zstd',
-          'Referer': baseUrl + '/',
-          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'same-origin',
-          'Sec-Fetch-User': '?1',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1'
         },
         maxRedirects: 5,
-        validateStatus: () => true
-      }).catch(() => null);
-
-      await new Promise(resolve => setTimeout(resolve, 2500));
-
-      // Step 3: Finally visit target URL
-      console.log(`   📍 Step 3: Scraping target URL...`);
-      const response = await client.get(url, {
-        timeout: 20000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Accept-Encoding': 'gzip, deflate, br, zstd',
-          'Referer': listPage,
-          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'same-origin',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1'
-        },
-        maxRedirects: 5,
-        validateStatus: () => true
+        validateStatus: (status) => status >= 200 && status < 500
       });
 
       if (response.status === 403) {
-        console.log(`   ❌ Cloudflare blocked request`);
-        throw new Error('Cloudflare protection detected. Coba manual atau gunakan proxy.');
-      }
-
-      if (response.status === 503) {
-        console.log(`   ⏸️  Server sedang maintenance atau rate limit`);
-        throw new Error('Server unavailable (503)');
+        console.log(`   ❌ Access forbidden (403)`);
+        throw new Error('Access forbidden (403)');
       }
 
       if (response.status !== 200) {
@@ -121,21 +51,25 @@ class ScraperService {
       const $ = cheerio.load(response.data);
       const results = [];
 
-      $('table tr').each((index, element) => {
-        if (index === 0) return;
-
+      // Parse table dengan class "table table-bordered theTable legend"
+      $('table.theTable tbody tr').each((index, element) => {
         const tds = $(element).find('td');
-        if (tds.length >= 3) {
-          const date = $(tds[0]).text().trim();
-          const periode = $(tds[1]).text().trim();
-          const nomor = $(tds[2]).text().trim();
+        
+        // Format: Periode | Hari | Tanggal | Nomor | Nomor 2 | Nomor 3
+        if (tds.length >= 4) {
+          const periode = $(tds[0]).text().trim();
+          const hari = $(tds[1]).text().trim();
+          const tanggal = $(tds[2]).text().trim();
+          const nomor = $(tds[3]).text().trim();
 
-          if (date && nomor && nomor.length === 4 && /^\d{4}$/.test(nomor)) {
+          // Ambil nomor 4 digit
+          if (nomor && nomor.length === 4 && /^\d{4}$/.test(nomor)) {
             results.push({
               pasaran: pasaran.toUpperCase(),
-              date: this.parseDate(date),
+              date: this.parseVespaDate(tanggal),
               result: nomor,
-              periode: periode
+              periode: periode,
+              hari: hari
             });
           }
         }
@@ -155,6 +89,23 @@ class ScraperService {
         error: error.message,
         data: []
       };
+    }
+  }
+
+  static parseVespaDate(dateStr) {
+    try {
+      // Format: "2025-10-31 | 23:18:13"
+      const cleaned = dateStr.trim();
+      const datePart = cleaned.split('|')[0].trim();
+      
+      // Parse YYYY-MM-DD
+      if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return new Date(datePart).toISOString();
+      }
+
+      return new Date(datePart).toISOString();
+    } catch (error) {
+      return new Date().toISOString();
     }
   }
 
@@ -193,11 +144,11 @@ class ScraperService {
         const result = await this.scrapeTogelData(url, pasaran);
         results[pasaran] = result;
         
-        // Add 5 second delay between requests
+        // Add 2 second delay between requests
         const pasaranKeys = Object.keys(urls);
         if (pasaranKeys.indexOf(pasaran) < pasaranKeys.length - 1) {
-          console.log(`⏳ Waiting 5 seconds before next scrape...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          console.log(`⏳ Waiting 2 seconds before next scrape...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       } else {
         results[pasaran] = {
