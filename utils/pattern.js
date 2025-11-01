@@ -101,6 +101,114 @@ class PatternAnalyzer {
 
     return { besar, kecil };
   }
+
+  static analyzeAllPositionPatterns(history, limit = 20) {
+    const recent = history.slice(-limit);
+    const patterns = {
+      as: { ganjil: 0, genap: 0, besar: 0, kecil: 0 },
+      kop: { ganjil: 0, genap: 0, besar: 0, kecil: 0 },
+      kepala: { ganjil: 0, genap: 0, besar: 0, kecil: 0 },
+      ekor: { ganjil: 0, genap: 0, besar: 0, kecil: 0 }
+    };
+
+    recent.forEach(item => {
+      if (item.result) {
+        const result = item.result.toString().padStart(4, '0');
+        const positions = ['as', 'kop', 'kepala', 'ekor'];
+        
+        positions.forEach((pos, idx) => {
+          const digit = parseInt(result[idx]);
+          const isGanjil = digit % 2 === 1;
+          const isBesar = digit >= 5;
+          
+          if (isGanjil) {
+            patterns[pos].ganjil++;
+          } else {
+            patterns[pos].genap++;
+          }
+          
+          if (isBesar) {
+            patterns[pos].besar++;
+          } else {
+            patterns[pos].kecil++;
+          }
+        });
+      }
+    });
+
+    Object.keys(patterns).forEach(pos => {
+      const p = patterns[pos];
+      const total = recent.length;
+      p.ganjilTendency = p.ganjil / total;
+      p.genapTendency = p.genap / total;
+      p.besarTendency = p.besar / total;
+      p.kecilTendency = p.kecil / total;
+    });
+
+    return patterns;
+  }
+
+  static hotColdWithDecay(history, limit = 30, decayRate = 0.95) {
+    const recent = history.slice(-limit);
+    const digitFreq = {};
+    const len = recent.length;
+    
+    recent.forEach((item, index) => {
+      if (item.result) {
+        const weight = Math.pow(decayRate, len - index - 1);
+        const digits = item.result.toString().split('');
+        digits.forEach(d => {
+          digitFreq[d] = (digitFreq[d] || 0) + weight;
+        });
+      }
+    });
+
+    const total = Object.values(digitFreq).reduce((a, b) => a + b, 0) || 1;
+    Object.keys(digitFreq).forEach(k => {
+      digitFreq[k] = digitFreq[k] / total;
+    });
+
+    const sorted = Object.entries(digitFreq).sort((a, b) => b[1] - a[1]);
+    
+    const hot = sorted.slice(0, 5).map(x => x[0]);
+    const cold = sorted.slice(-5).reverse().map(x => x[0]);
+    
+    for (let i = 0; i < 10; i++) {
+      if (!digitFreq.hasOwnProperty(i.toString())) {
+        cold.push(i.toString());
+      }
+    }
+
+    const normalizedFreq = {};
+    for (let i = 0; i < 10; i++) {
+      normalizedFreq[i] = digitFreq[i.toString()] || 0;
+    }
+
+    return {
+      hot: [...new Set(hot)].slice(0, 5),
+      cold: [...new Set(cold)].slice(0, 5),
+      frequency: normalizedFreq
+    };
+  }
+
+  static analyzePositionCorrelation(history, pos1, pos2, limit = 30) {
+    const recent = history.slice(-limit);
+    const correlations = {};
+    
+    recent.forEach(item => {
+      if (item.result) {
+        const result = item.result.toString().padStart(4, '0');
+        const d1 = parseInt(result[pos1]);
+        const d2 = parseInt(result[pos2]);
+        const key = `${d1}-${d2}`;
+        correlations[key] = (correlations[key] || 0) + 1;
+      }
+    });
+
+    return Object.entries(correlations)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+  }
 }
 
 module.exports = PatternAnalyzer;

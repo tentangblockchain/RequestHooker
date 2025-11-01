@@ -12,33 +12,23 @@ class PredictionEngine {
     }
 
     const pattern = PatternAnalyzer.analyzePattern(history);
-    const hotCold = PatternAnalyzer.hotColdNumbers(history);
+    const hotCold = PatternAnalyzer.hotColdWithDecay(history);
     const ganjilGenap = PatternAnalyzer.analyzeGanjilGenap(history);
     const besarKecil = PatternAnalyzer.analyzeBesarKecil(history);
+    const allPositionPatterns = PatternAnalyzer.analyzeAllPositionPatterns(history);
 
     const lastResult = history[history.length - 1]?.result || '1234';
 
-    const asMarkov = StatisticsEngine.predictWithMarkov(history, 0, 3);
-    const asProb = StatisticsEngine.predictWithProbability(history, 0, 3);
-    const as = [...new Set([...asMarkov, ...asProb])].slice(0, 3);
+    const as = StatisticsEngine.weightedEnsemblePrediction(history, 0);
+    const kop = StatisticsEngine.weightedEnsemblePrediction(history, 1);
+    const kepala = StatisticsEngine.weightedEnsemblePrediction(history, 2);
+    const ekor = StatisticsEngine.weightedEnsemblePrediction(history, 3);
 
-    const kopMarkov = StatisticsEngine.predictWithMarkov(history, 1, 3);
-    const kopProb = StatisticsEngine.predictWithProbability(history, 1, 3);
-    const kop = [...new Set([...kopMarkov, ...kopProb])].slice(0, 3);
+    const ai = this.generateAIWithScoring(hotCold, lastResult, history);
+    const bbfs = this.generateIntelligentBBFS(as, kop, kepala, ekor, history);
+    const combinations4D = this.generateRanked4DCombinations(as, kop, kepala, ekor, history);
 
-    const kepalaMarkov = StatisticsEngine.predictWithMarkov(history, 2, 4);
-    const kepalaProb = StatisticsEngine.predictWithProbability(history, 2, 4);
-    const kepala = [...new Set([...kepalaMarkov, ...kepalaProb])].slice(0, 4);
-
-    const ekorMarkov = StatisticsEngine.predictWithMarkov(history, 3, 4);
-    const ekorProb = StatisticsEngine.predictWithProbability(history, 3, 4);
-    const ekor = [...new Set([...ekorMarkov, ...ekorProb])].slice(0, 4);
-
-    const ai = this.generateAI(hotCold, lastResult, history);
-    const bbfs = this.generateBBFS(as, kop, kepala, ekor, hotCold.hot);
-    const combinations4D = this.generate4DCombinations(as, kop, kepala, ekor);
-
-    const topFormulas = this.getTopFormulas();
+    const topFormulas = this.getAdaptiveFormulas(pasaran, history);
     const formulas = {};
     topFormulas.forEach(f => {
       formulas[f] = TogelFormulas.applyFormula(lastResult, f);
@@ -50,6 +40,9 @@ class PredictionEngine {
       kepala: StatisticsEngine.detectTrend(history, 2),
       ekor: StatisticsEngine.detectTrend(history, 3)
     };
+
+    const bigrams = StatisticsEngine.analyzeBigrams(history, 2, 3);
+    const trigrams = StatisticsEngine.analyzeTrigrams(history);
 
     return {
       ai,
@@ -63,9 +56,12 @@ class PredictionEngine {
       hotCold,
       pattern: {
         ganjilGenap,
-        besarKecil
+        besarKecil,
+        allPositions: allPositionPatterns
       },
       trends,
+      bigrams: bigrams.slice(0, 5),
+      trigrams: trigrams.slice(0, 3),
       lastResult,
       dataCount: history.length,
       confidence: this.calculateConfidence(history.length)
@@ -111,6 +107,41 @@ class PredictionEngine {
     return _.sampleSize(aiArray, Math.min(5, aiArray.length)).sort((a, b) => a - b);
   }
 
+  static generateAIWithScoring(hotCold, lastResult, history) {
+    const scores = {};
+    
+    for (let i = 0; i < 10; i++) {
+      scores[i] = 0;
+    }
+
+    Object.entries(hotCold.frequency).forEach(([digit, freq]) => {
+      scores[digit] = (scores[digit] || 0) + (freq * 0.35);
+    });
+
+    for (let pos = 0; pos < 4; pos++) {
+      const ensemble = StatisticsEngine.weightedEnsemblePrediction(history, pos);
+      ensemble.forEach((d, idx) => {
+        const rankWeight = (4 - idx) / 10;
+        scores[d] = (scores[d] || 0) + (rankWeight * 0.40);
+      });
+    }
+
+    const consecutive = StatisticsEngine.findConsecutivePatterns(history);
+    consecutive.forEach(d => {
+      scores[d] = (scores[d] || 0) + 0.15;
+    });
+
+    const lastDigits = lastResult.toString().split('').map(Number);
+    lastDigits.forEach(d => {
+      scores[d] = (scores[d] || 0) + 0.10;
+    });
+
+    return Object.entries(scores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([digit]) => parseInt(digit));
+  }
+
   static generateBBFS(as, kop, kepala, ekor, hotNumbers) {
     const pool = new Set();
     
@@ -123,6 +154,29 @@ class PredictionEngine {
 
     while (pool.size < 7) {
       pool.add(Math.floor(Math.random() * 10));
+    }
+
+    return Array.from(pool).slice(0, 7).sort((a, b) => a - b).join('');
+  }
+
+  static generateIntelligentBBFS(as, kop, kepala, ekor, history) {
+    const pool = new Set();
+    
+    as.forEach(d => pool.add(d));
+    kop.forEach(d => pool.add(d));
+    kepala.forEach(d => pool.add(d));
+    ekor.forEach(d => pool.add(d));
+
+    if (pool.size < 7) {
+      const freqScores = StatisticsEngine.getDigitFrequencyScores(history);
+      const sorted = Object.entries(freqScores)
+        .sort((a, b) => b[1] - a[1])
+        .map(([d]) => parseInt(d));
+      
+      for (let digit of sorted) {
+        pool.add(digit);
+        if (pool.size >= 7) break;
+      }
     }
 
     return Array.from(pool).slice(0, 7).sort((a, b) => a - b).join('');
@@ -144,6 +198,54 @@ class PredictionEngine {
     return combinations.slice(0, 10);
   }
 
+  static generateRanked4DCombinations(as, kop, kepala, ekor, history) {
+    const combinations = [];
+
+    for (let a of as) {
+      for (let k of kop) {
+        for (let kp of kepala) {
+          for (let e of ekor) {
+            const combo = `${a}${k}${kp}${e}`;
+            const score = this.score4DCombination(combo, history);
+            combinations.push({ combo, score });
+          }
+        }
+      }
+    }
+
+    return combinations
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(c => c.combo);
+  }
+
+  static score4DCombination(combo, history) {
+    let score = 0;
+    const digits = combo.split('').map(Number);
+
+    const freqScores = StatisticsEngine.getDigitFrequencyScores(history);
+    digits.forEach(d => {
+      score += freqScores[d] || 0;
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const bigram = combo.substring(i, i + 2);
+      score += StatisticsEngine.getBigramScore(bigram, history) * 2;
+    }
+
+    const ganjil = digits.filter(d => d % 2 === 1).length;
+    if (ganjil >= 2 && ganjil <= 3) {
+      score += 0.15;
+    }
+
+    const besar = digits.filter(d => d >= 5).length;
+    if (besar >= 2 && besar <= 3) {
+      score += 0.10;
+    }
+
+    return score;
+  }
+
   static generateRandom4D(count) {
     const combinations = [];
     for (let i = 0; i < count; i++) {
@@ -155,6 +257,47 @@ class PredictionEngine {
 
   static getTopFormulas() {
     return ['Mistik', 'ML', 'IX', 'M1', 'M3', 'M5', 'M7', 'TY'];
+  }
+
+  static getAdaptiveFormulas(pasaran, history) {
+    if (history.length < 10) {
+      return this.getTopFormulas().slice(0, 5);
+    }
+
+    const allFormulas = ['Mistik', 'ML', 'IX', 'M1', 'M3', 'M5', 'M7', 'M8', 'M9', 'TY'];
+    const formulaScores = {};
+
+    allFormulas.forEach(formula => {
+      formulaScores[formula] = this.evaluateFormulaAccuracy(history, formula);
+    });
+
+    return Object.entries(formulaScores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([formula]) => formula);
+  }
+
+  static evaluateFormulaAccuracy(history, formula) {
+    if (history.length < 5) return 0;
+
+    let hits = 0;
+    const testSize = Math.min(10, history.length - 1);
+
+    for (let i = history.length - testSize; i < history.length; i++) {
+      if (i === 0) continue;
+
+      const prevResult = history[i - 1].result;
+      const actualResult = history[i].result.toString().padStart(4, '0');
+      const actualDigits = actualResult.split('').map(Number);
+
+      const transformed = TogelFormulas.applyFormula(prevResult, formula);
+      const transformedDigits = transformed.toString().padStart(4, '0').split('').map(Number);
+
+      const hasMatch = transformedDigits.some(td => actualDigits.includes(td));
+      if (hasMatch) hits++;
+    }
+
+    return hits / testSize;
   }
 
   static calculateConfidence(dataCount) {

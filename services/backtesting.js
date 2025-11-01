@@ -40,19 +40,16 @@ class BacktestingService {
       const actualKepala = actualDigits[2];
       const actualEkor = actualDigits[3];
 
-      const aiHit = prediction.ai.includes(actualAS) || 
-                    prediction.ai.includes(actualKOP) || 
-                    prediction.ai.includes(actualKepala) || 
-                    prediction.ai.includes(actualEkor);
+      const aiHit = actualDigits.every(d => prediction.ai.includes(d));
       
       const kepalaHit = prediction.kepala.includes(actualKepala);
       const ekorHit = prediction.ekor.includes(actualEkor);
       const asHit = prediction.as.includes(actualAS);
       const kopHit = prediction.kop.includes(actualKOP);
-      const bbfsHit = prediction.bbfs.includes(actualAS.toString()) &&
-                       prediction.bbfs.includes(actualKOP.toString()) &&
-                       prediction.bbfs.includes(actualKepala.toString()) &&
-                       prediction.bbfs.includes(actualEkor.toString());
+      
+      const bbfsDigits = prediction.bbfs.split('').map(Number);
+      const bbfsHit = actualDigits.every(d => bbfsDigits.includes(d));
+      
       const combo4DHit = prediction.combinations4D.includes(actualResult);
 
       if (aiHit) results.hits.ai++;
@@ -69,6 +66,8 @@ class BacktestingService {
           ai: prediction.ai,
           kepala: prediction.kepala,
           ekor: prediction.ekor,
+          as: prediction.as,
+          kop: prediction.kop,
           combinations4D: prediction.combinations4D.slice(0, 5)
         },
         hits: { aiHit, kepalaHit, ekorHit, asHit, kopHit, bbfsHit, combo4DHit }
@@ -83,6 +82,99 @@ class BacktestingService {
       kop: ((results.hits.kop / testSize) * 100).toFixed(2) + '%',
       bbfs: ((results.hits.bbfs / testSize) * 100).toFixed(2) + '%',
       combinations4D: ((results.hits.combinations4D / testSize) * 100).toFixed(2) + '%'
+    };
+
+    return {
+      success: true,
+      results
+    };
+  }
+
+  static runRollingBacktest(pasaran, testSize = 10, windowSize = 50) {
+    const history = storage.getHistory(pasaran);
+    
+    if (history.length < testSize + Math.min(windowSize, 20)) {
+      return {
+        success: false,
+        message: `Tidak cukup data untuk rolling backtest. Butuh minimal ${testSize + 20}, ada ${history.length}`
+      };
+    }
+
+    const results = {
+      pasaran,
+      totalTests: testSize,
+      windowSize,
+      hits: {
+        ai: 0,
+        kepala: 0,
+        ekor: 0,
+        as: 0,
+        kop: 0,
+        bbfs: 0,
+        combinations4D: 0
+      },
+      accuracy: {},
+      details: []
+    };
+
+    for (let i = history.length - testSize; i < history.length; i++) {
+      const trainingStart = Math.max(0, i - windowSize);
+      const trainingData = history.slice(trainingStart, i);
+      const actualResult = history[i].result.toString().padStart(4, '0');
+      
+      if (trainingData.length < 5) continue;
+      
+      const prediction = PredictionEngine.generateCompletePrediction(trainingData, pasaran);
+      
+      const actualDigits = actualResult.split('').map(Number);
+      const actualAS = actualDigits[0];
+      const actualKOP = actualDigits[1];
+      const actualKepala = actualDigits[2];
+      const actualEkor = actualDigits[3];
+
+      const aiHit = actualDigits.every(d => prediction.ai.includes(d));
+      const kepalaHit = prediction.kepala.includes(actualKepala);
+      const ekorHit = prediction.ekor.includes(actualEkor);
+      const asHit = prediction.as.includes(actualAS);
+      const kopHit = prediction.kop.includes(actualKOP);
+      
+      const bbfsDigits = prediction.bbfs.split('').map(Number);
+      const bbfsHit = actualDigits.every(d => bbfsDigits.includes(d));
+      
+      const combo4DHit = prediction.combinations4D.includes(actualResult);
+
+      if (aiHit) results.hits.ai++;
+      if (kepalaHit) results.hits.kepala++;
+      if (ekorHit) results.hits.ekor++;
+      if (asHit) results.hits.as++;
+      if (kopHit) results.hits.kop++;
+      if (bbfsHit) results.hits.bbfs++;
+      if (combo4DHit) results.hits.combinations4D++;
+
+      results.details.push({
+        actual: actualResult,
+        trainingSize: trainingData.length,
+        prediction: {
+          ai: prediction.ai,
+          kepala: prediction.kepala,
+          ekor: prediction.ekor,
+          combinations4D: prediction.combinations4D.slice(0, 5)
+        },
+        hits: { aiHit, kepalaHit, ekorHit, asHit, kopHit, bbfsHit, combo4DHit }
+      });
+    }
+
+    const actualTests = results.details.length;
+    results.totalTests = actualTests;
+
+    results.accuracy = {
+      ai: ((results.hits.ai / actualTests) * 100).toFixed(2) + '%',
+      kepala: ((results.hits.kepala / actualTests) * 100).toFixed(2) + '%',
+      ekor: ((results.hits.ekor / actualTests) * 100).toFixed(2) + '%',
+      as: ((results.hits.as / actualTests) * 100).toFixed(2) + '%',
+      kop: ((results.hits.kop / actualTests) * 100).toFixed(2) + '%',
+      bbfs: ((results.hits.bbfs / actualTests) * 100).toFixed(2) + '%',
+      combinations4D: ((results.hits.combinations4D / actualTests) * 100).toFixed(2) + '%'
     };
 
     return {
