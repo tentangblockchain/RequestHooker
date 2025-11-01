@@ -2,6 +2,11 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
+const { wrapper } = require('axios-cookiejar-support');
+const { CookieJar } = require('tough-cookie');
+
+const jar = new CookieJar();
+const client = wrapper(axios.create({ jar }));
 
 class ScraperService {
   static getConfig() {
@@ -20,77 +25,98 @@ class ScraperService {
 
   static async scrapeTogelData(url, pasaran) {
     try {
-      // First request to get session cookie
       const baseUrl = new URL(url).origin;
       const listPage = `${baseUrl}/wap/pasaran.html`;
       
-      const sessionResponse = await axios.get(listPage, {
-        timeout: 15000,
+      // Step 1: Visit homepage first
+      console.log(`   📍 Step 1: Visiting ${baseUrl}...`);
+      await client.get(baseUrl, {
+        timeout: 20000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-          'Accept-Language': 'id,en-US;q=0.9,en;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
           'Accept-Encoding': 'gzip, deflate, br, zstd',
-          'Connection': 'keep-alive',
-          'Cache-Control': 'max-age=0',
-          'Upgrade-Insecure-Requests': '1',
+          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
           'Sec-Fetch-Dest': 'document',
           'Sec-Fetch-Mode': 'navigate',
           'Sec-Fetch-Site': 'none',
           'Sec-Fetch-User': '?1',
-          'sec-ch-ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Priority': 'u=0, i'
+          'Upgrade-Insecure-Requests': '1',
+          'Cache-Control': 'max-age=0'
         },
         maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 500
+        validateStatus: () => true
       }).catch(() => null);
 
-      // Extract cookies
-      let cookies = '';
-      if (sessionResponse && sessionResponse.headers['set-cookie']) {
-        cookies = sessionResponse.headers['set-cookie']
-          .map(cookie => cookie.split(';')[0])
-          .join('; ');
-      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Add delay to simulate human behavior
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Main request with session
-      const response = await axios.get(url, {
-        timeout: 15000,
+      // Step 2: Visit pasaran list
+      console.log(`   📍 Step 2: Visiting pasaran list...`);
+      await client.get(listPage, {
+        timeout: 20000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-          'Accept-Language': 'id,en-US;q=0.9,en;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
           'Accept-Encoding': 'gzip, deflate, br, zstd',
-          'Connection': 'keep-alive',
-          'Cache-Control': 'max-age=0',
-          'Referer': listPage,
-          'Upgrade-Insecure-Requests': '1',
+          'Referer': baseUrl + '/',
+          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
           'Sec-Fetch-Dest': 'document',
           'Sec-Fetch-Mode': 'navigate',
           'Sec-Fetch-Site': 'same-origin',
           'Sec-Fetch-User': '?1',
-          'sec-ch-ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-          'Priority': 'u=0, i',
-          'Cookie': cookies
+          'Upgrade-Insecure-Requests': '1'
         },
         maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 500
+        validateStatus: () => true
+      }).catch(() => null);
+
+      await new Promise(resolve => setTimeout(resolve, 2500));
+
+      // Step 3: Finally visit target URL
+      console.log(`   📍 Step 3: Scraping target URL...`);
+      const response = await client.get(url, {
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Referer': listPage,
+          'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'same-origin',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1'
+        },
+        maxRedirects: 5,
+        validateStatus: () => true
       });
 
       if (response.status === 403) {
-        throw new Error('Cloudflare block. Website terlalu ketat proteksinya.');
+        console.log(`   ❌ Cloudflare blocked request`);
+        throw new Error('Cloudflare protection detected. Coba manual atau gunakan proxy.');
+      }
+
+      if (response.status === 503) {
+        console.log(`   ⏸️  Server sedang maintenance atau rate limit`);
+        throw new Error('Server unavailable (503)');
       }
 
       if (response.status !== 200) {
+        console.log(`   ⚠️  HTTP ${response.status}: ${response.statusText}`);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      console.log(`   ✅ Response OK (${response.status})`);
 
       const $ = cheerio.load(response.data);
       const results = [];
@@ -167,11 +193,11 @@ class ScraperService {
         const result = await this.scrapeTogelData(url, pasaran);
         results[pasaran] = result;
         
-        // Add 3 second delay between requests
+        // Add 5 second delay between requests
         const pasaranKeys = Object.keys(urls);
         if (pasaranKeys.indexOf(pasaran) < pasaranKeys.length - 1) {
-          console.log(`⏳ Waiting 3 seconds before next scrape...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          console.log(`⏳ Waiting 5 seconds before next scrape...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
       } else {
         results[pasaran] = {
