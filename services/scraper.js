@@ -27,12 +27,17 @@ class ScraperService {
       // Launch headless browser
       browser = await puppeteer.launch({
         headless: 'new',
+        executablePath: '/nix/store/*-chromium-*/bin/chromium',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-accelerated-2d-canvas',
-          '--disable-gpu'
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+          '--disable-dev-tools',
+          '--no-zygote',
+          '--single-process'
         ]
       });
 
