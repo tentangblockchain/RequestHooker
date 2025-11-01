@@ -17,11 +17,13 @@ class BacktestingService {
       totalTests: testSize,
       hits: {
         ai: 0,
+        ai_partial: 0,
         kepala: 0,
         ekor: 0,
         as: 0,
         kop: 0,
         bbfs: 0,
+        bbfs_partial: 0,
         combinations4D: 0
       },
       accuracy: {},
@@ -41,6 +43,7 @@ class BacktestingService {
       const actualEkor = actualDigits[3];
 
       const aiHit = actualDigits.every(d => prediction.ai.includes(d));
+      const aiPartialHit = actualDigits.some(d => prediction.ai.includes(d));
       
       const kepalaHit = prediction.kepala.includes(actualKepala);
       const ekorHit = prediction.ekor.includes(actualEkor);
@@ -49,15 +52,18 @@ class BacktestingService {
       
       const bbfsDigits = prediction.bbfs.split('').map(Number);
       const bbfsHit = actualDigits.every(d => bbfsDigits.includes(d));
+      const bbfsPartialHit = actualDigits.filter(d => bbfsDigits.includes(d)).length >= 3;
       
       const combo4DHit = prediction.combinations4D.includes(actualResult);
 
       if (aiHit) results.hits.ai++;
+      if (aiPartialHit) results.hits.ai_partial++;
       if (kepalaHit) results.hits.kepala++;
       if (ekorHit) results.hits.ekor++;
       if (asHit) results.hits.as++;
       if (kopHit) results.hits.kop++;
       if (bbfsHit) results.hits.bbfs++;
+      if (bbfsPartialHit) results.hits.bbfs_partial++;
       if (combo4DHit) results.hits.combinations4D++;
 
       results.details.push({
@@ -76,11 +82,13 @@ class BacktestingService {
 
     results.accuracy = {
       ai: ((results.hits.ai / testSize) * 100).toFixed(2) + '%',
+      ai_partial: ((results.hits.ai_partial / testSize) * 100).toFixed(2) + '%',
       kepala: ((results.hits.kepala / testSize) * 100).toFixed(2) + '%',
       ekor: ((results.hits.ekor / testSize) * 100).toFixed(2) + '%',
       as: ((results.hits.as / testSize) * 100).toFixed(2) + '%',
       kop: ((results.hits.kop / testSize) * 100).toFixed(2) + '%',
       bbfs: ((results.hits.bbfs / testSize) * 100).toFixed(2) + '%',
+      bbfs_partial: ((results.hits.bbfs_partial / testSize) * 100).toFixed(2) + '%',
       combinations4D: ((results.hits.combinations4D / testSize) * 100).toFixed(2) + '%'
     };
 

@@ -24,11 +24,36 @@ class ScraperService {
     try {
       console.log(`   📍 Scraping ${url}...`);
       
-      // Launch headless browser
-      const executablePath = require('child_process')
-        .execSync('which chromium')
-        .toString()
-        .trim();
+      // Find Chromium executable path with better error handling
+      let executablePath;
+      try {
+        executablePath = require('child_process')
+          .execSync('which chromium-browser || which chromium || which google-chrome')
+          .toString()
+          .trim();
+      } catch (error) {
+        console.log(`   ⚠️  Chromium not found, trying default path...`);
+        // Try common paths
+        const commonPaths = [
+          '/usr/bin/chromium',
+          '/usr/bin/chromium-browser',
+          '/usr/bin/google-chrome',
+          process.env.PUPPETEER_EXECUTABLE_PATH
+        ];
+        
+        for (const path of commonPaths) {
+          if (path && require('fs').existsSync(path)) {
+            executablePath = path;
+            break;
+          }
+        }
+        
+        if (!executablePath) {
+          throw new Error('Chromium executable not found. Please install chromium.');
+        }
+      }
+      
+      console.log(`   📦 Using Chromium: ${executablePath}`);
       
       browser = await puppeteer.launch({
         headless: 'new',
@@ -106,15 +131,21 @@ class ScraperService {
 
     } catch (error) {
       console.log(`   ❌ Error: ${error.message}`);
+      console.log(`   💡 Tip: Make sure Chromium is installed and accessible`);
       return {
         success: false,
         pasaran,
         error: error.message,
-        data: []
+        data: [],
+        suggestion: 'Install chromium or check if puppeteer can access the browser'
       };
     } finally {
       if (browser) {
-        await browser.close();
+        try {
+          await browser.close();
+        } catch (closeError) {
+          console.log(`   ⚠️  Error closing browser: ${closeError.message}`);
+        }
       }
     }
   }

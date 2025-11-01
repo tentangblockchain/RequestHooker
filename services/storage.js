@@ -56,32 +56,44 @@ class StorageService {
   }
 
   addHistory(pasaran, result) {
-    const normalizedResult = this.normalizeResult(result);
-    const normalizedPasaran = pasaran.toUpperCase();
-    
-    // Check for duplicate (same pasaran & result on same day)
-    const today = new Date().toISOString().split('T')[0];
-    const duplicate = this.data.history.find(h => 
-      h.pasaran === normalizedPasaran && 
-      h.result === normalizedResult &&
-      h.date.startsWith(today)
-    );
-    
-    if (duplicate) {
-      return { success: false, message: 'Data sudah ada untuk hari ini', duplicate: true };
+    try {
+      const normalizedResult = this.normalizeResult(result);
+      const normalizedPasaran = pasaran.toUpperCase();
+      
+      // Validate pasaran
+      const config = require('../config/config');
+      if (!config.app.supportedPasaran.includes(normalizedPasaran)) {
+        return { success: false, message: `Invalid pasaran: ${pasaran}. Supported: ${config.app.supportedPasaran.join(', ')}` };
+      }
+      
+      // Check for duplicate (same pasaran & result on same day)
+      const today = new Date().toISOString().split('T')[0];
+      const duplicate = this.data.history.find(h => 
+        h.pasaran === normalizedPasaran && 
+        h.result === normalizedResult &&
+        h.date.startsWith(today)
+      );
+      
+      if (duplicate) {
+        return { success: false, message: 'Data sudah ada untuk hari ini', duplicate: true };
+      }
+      
+      const entry = {
+        pasaran: normalizedPasaran,
+        date: new Date().toISOString(),
+        result: normalizedResult
+      };
+      
+      this.data.history.push(entry);
+      this.cleanOldData(normalizedPasaran);
+      this.updatePredictionTracking(normalizedPasaran, normalizedResult);
+      
+      const saved = this.saveData();
+      return saved ? { success: true } : { success: false, message: 'Failed to save data' };
+    } catch (error) {
+      console.error('Error in addHistory:', error.message);
+      return { success: false, message: error.message };
     }
-    
-    const entry = {
-      pasaran: normalizedPasaran,
-      date: new Date().toISOString(),
-      result: normalizedResult
-    };
-    
-    this.data.history.push(entry);
-    this.cleanOldData(normalizedPasaran);
-    this.updatePredictionTracking(normalizedPasaran, normalizedResult);
-    
-    return this.saveData();
   }
 
   addHistoryWithDate(pasaran, result, customDate = null) {
@@ -187,7 +199,15 @@ class StorageService {
 
   normalizeResult(result) {
     const resultStr = result.toString().replace(/\D/g, '');
-    return resultStr.padStart(4, '0');
+    const normalized = resultStr.padStart(4, '0').slice(-4); // Ensure exactly 4 digits
+    
+    // Validate that result is a valid 4-digit number
+    const numValue = parseInt(normalized);
+    if (isNaN(numValue) || numValue < 0 || numValue > 9999) {
+      throw new Error(`Invalid result: ${result}. Must be a number between 0 and 9999`);
+    }
+    
+    return normalized;
   }
 
   addPrediction(pasaran, prediction) {
@@ -297,9 +317,17 @@ class StorageService {
   }
 
   getHistory(pasaran, limit = null) {
-    const history = this.data.history.filter(h => 
-      h.pasaran === pasaran.toUpperCase()
-    );
+    const normalizedPasaran = pasaran.toUpperCase();
+    
+    // Filter by pasaran and ensure data integrity
+    const history = this.data.history
+      .filter(h => h.pasaran === normalizedPasaran && h.result)
+      .map(h => ({
+        ...h,
+        result: typeof h.result === 'string' ? h.result : h.result.toString().padStart(4, '0')
+      }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date)); // Ensure chronological order
+    
     return limit ? history.slice(-limit) : history;
   }
 

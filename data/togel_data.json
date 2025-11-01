@@ -199,6 +199,11 @@
       "pasaran": "SDY",
       "date": "2025-11-01T00:00:00.000Z",
       "result": "3389"
+    },
+    {
+      "pasaran": "HK",
+      "date": "2025-11-01T00:00:00.000Z",
+      "result": "6555"
     }
   ],
   "predictions": [
@@ -2195,8 +2200,18 @@
           "1541"
         ]
       },
-      "actual": null,
-      "verified": false
+      "actual": "6555",
+      "verified": true,
+      "verifiedDate": "2025-11-01T16:24:32.022Z",
+      "hits": {
+        "ai": false,
+        "kepala": true,
+        "ekor": false,
+        "as": false,
+        "kop": true,
+        "bbfs": true,
+        "combinations4D": false
+      }
     },
     {
       "pasaran": "SGP",
@@ -2599,5 +2614,23 @@
       "verified": false
     }
   ],
-  "winRates": {}
+  "winRates": {
+    "HK": {
+      "ai": 0,
+      "kepala": 1,
+      "ekor": 0,
+      "as": 0,
+      "kop": 1,
+      "bbfs": 1,
+      "combinations4D": 0,
+      "total": 1,
+      "ai_percentage": "0.00%",
+      "kepala_percentage": "100.00%",
+      "ekor_percentage": "0.00%",
+      "as_percentage": "0.00%",
+      "kop_percentage": "100.00%",
+      "bbfs_percentage": "100.00%",
+      "combinations4D_percentage": "0.00%"
+    }
+  }
 }

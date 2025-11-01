@@ -5,19 +5,31 @@ const StatisticsEngine = require('../utils/statistics');
 
 class PredictionEngine {
   static generateCompletePrediction(history, pasaran) {
+    // Defensive: ensure history is valid
+    if (!history || !Array.isArray(history)) {
+      console.error('Invalid history data provided to generateCompletePrediction');
+      return this.generateRandomPrediction();
+    }
+    
     const hasEnoughData = history.length >= 5;
     
     if (!hasEnoughData) {
+      console.log(`⚠️  Only ${history.length} data points available for ${pasaran}. Generating random prediction.`);
       return this.generateRandomPrediction();
     }
 
-    const pattern = PatternAnalyzer.analyzePattern(history);
-    const hotCold = PatternAnalyzer.hotColdWithDecay(history);
-    const ganjilGenap = PatternAnalyzer.analyzeGanjilGenap(history);
-    const besarKecil = PatternAnalyzer.analyzeBesarKecil(history);
-    const allPositionPatterns = PatternAnalyzer.analyzeAllPositionPatterns(history);
+    try {
+      const pattern = PatternAnalyzer.analyzePattern(history);
+      const hotCold = PatternAnalyzer.hotColdWithDecay ? 
+        PatternAnalyzer.hotColdWithDecay(history) : 
+        PatternAnalyzer.hotColdNumbers(history);
+      const ganjilGenap = PatternAnalyzer.analyzeGanjilGenap(history);
+      const besarKecil = PatternAnalyzer.analyzeBesarKecil(history);
+      const allPositionPatterns = PatternAnalyzer.analyzeAllPositionPatterns ? 
+        PatternAnalyzer.analyzeAllPositionPatterns(history) : 
+        null;
 
-    const lastResult = history[history.length - 1]?.result || '1234';
+      const lastResult = history[history.length - 1]?.result || '1234';
 
     const as = StatisticsEngine.weightedEnsemblePrediction(history, 0);
     const kop = StatisticsEngine.weightedEnsemblePrediction(history, 1);
@@ -44,28 +56,76 @@ class PredictionEngine {
     const bigrams = StatisticsEngine.analyzeBigrams(history, 2, 3);
     const trigrams = StatisticsEngine.analyzeTrigrams(history);
 
-    return {
-      ai,
-      kepala,
-      ekor,
-      as,
-      kop,
-      bbfs,
-      combinations4D,
-      formulas,
-      hotCold,
-      pattern: {
-        ganjilGenap,
-        besarKecil,
-        allPositions: allPositionPatterns
-      },
-      trends,
-      bigrams: bigrams.slice(0, 5),
-      trigrams: trigrams.slice(0, 3),
-      lastResult,
-      dataCount: history.length,
-      confidence: this.calculateConfidence(history.length)
-    };
+      return {
+        ai,
+        kepala,
+        ekor,
+        as,
+        kop,
+        bbfs,
+        combinations4D,
+        formulas,
+        hotCold,
+        pattern: {
+          ganjilGenap,
+          besarKecil,
+          allPositions: allPositionPatterns
+        },
+        trends,
+        bigrams: bigrams.slice(0, 5),
+        trigrams: trigrams.slice(0, 3),
+        lastResult,
+        dataCount: history.length,
+        confidence: this.calculateConfidence(history.length)
+      };
+    } catch (error) {
+      console.error('Error in generateCompletePrediction:', error.message);
+      console.log('Falling back to safe prediction generation...');
+      
+      // Fallback: generate safe prediction with available data
+      try {
+        const safePattern = PatternAnalyzer.analyzePattern(history);
+        const safeHotCold = PatternAnalyzer.hotColdNumbers(history);
+        const lastResult = history[history.length - 1]?.result || '1234';
+        
+        return {
+          ai: this.generateAIWithScoring(safeHotCold, lastResult, history),
+          kepala: StatisticsEngine.weightedEnsemblePrediction(history, 2),
+          ekor: StatisticsEngine.weightedEnsemblePrediction(history, 3),
+          as: StatisticsEngine.weightedEnsemblePrediction(history, 0),
+          kop: StatisticsEngine.weightedEnsemblePrediction(history, 1),
+          bbfs: this.generateBBFS(
+            StatisticsEngine.weightedEnsemblePrediction(history, 0),
+            StatisticsEngine.weightedEnsemblePrediction(history, 1),
+            StatisticsEngine.weightedEnsemblePrediction(history, 2),
+            StatisticsEngine.weightedEnsemblePrediction(history, 3),
+            safeHotCold.hot
+          ),
+          combinations4D: this.generate4DCombinations(
+            StatisticsEngine.weightedEnsemblePrediction(history, 0),
+            StatisticsEngine.weightedEnsemblePrediction(history, 1),
+            StatisticsEngine.weightedEnsemblePrediction(history, 2),
+            StatisticsEngine.weightedEnsemblePrediction(history, 3)
+          ),
+          formulas: {},
+          hotCold: safeHotCold,
+          pattern: {
+            ganjilGenap: PatternAnalyzer.analyzeGanjilGenap(history),
+            besarKecil: PatternAnalyzer.analyzeBesarKecil(history),
+            allPositions: null
+          },
+          trends: {},
+          bigrams: [],
+          trigrams: [],
+          lastResult,
+          dataCount: history.length,
+          confidence: this.calculateConfidence(history.length)
+        };
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError.message);
+        return this.generateRandomPrediction();
+      }
+    }
   }
 
   static generateRandomPrediction() {
