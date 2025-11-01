@@ -16,6 +16,8 @@ Bot Telegram untuk prediksi togel dengan analisis statistik mendalam, machine le
 - ✅ Improved error handling & validation
 - ✅ Statistical methods: Markov Chain, smoothing, trend detection
 - ✅ Confidence levels based on data quantity
+- ✅ **Web Scraper Integration** - Auto import data dari website
+- ✅ **Data Retention: 90 hari** (upgraded dari 16 hari untuk akurasi lebih baik)
 
 ## Project Architecture
 

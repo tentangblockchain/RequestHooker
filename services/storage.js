@@ -166,14 +166,14 @@ class StorageService {
   }
 
   cleanOldData(pasaran) {
-    const maxResults = 16;
+    const maxResults = 90;
     const pasaranHistory = this.data.history.filter(h => h.pasaran === pasaran);
     
     if (pasaranHistory.length > maxResults) {
       // Sort by date (oldest first)
       pasaranHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
       
-      // Get entries to remove (keep only last 16 results)
+      // Get entries to remove (keep only last 90 results / ~3 months)
       const toRemove = pasaranHistory.slice(0, pasaranHistory.length - maxResults);
       
       // Remove old entries
