@@ -25,9 +25,14 @@ class ScraperService {
       console.log(`   📍 Scraping ${url}...`);
       
       // Launch headless browser
+      const executablePath = require('child_process')
+        .execSync('which chromium')
+        .toString()
+        .trim();
+      
       browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/nix/store/*-chromium-*/bin/chromium',
+        executablePath: executablePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
