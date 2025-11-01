@@ -3,6 +3,7 @@ const config = require('../config/config');
 const PredictionEngine = require('../services/prediction');
 const PatternAnalyzer = require('../utils/pattern');
 const BacktestingService = require('../services/backtesting');
+const ScraperService = require('../services/scraper');
 const storage = require('../services/storage');
 const KeyboardHelper = require('./keyboards');
 const SchedulerService = require('./scheduler');
@@ -43,6 +44,8 @@ class TelegramBotHandler {
     this.bot.onText(/\/addadmin (\d+)/, (msg, match) => this.handleAddAdmin(msg, match));
     this.bot.onText(/\/removeadmin (\d+)/, (msg, match) => this.handleRemoveAdmin(msg, match));
     this.bot.onText(/\/admins/, (msg) => this.handleListAdmins(msg));
+    this.bot.onText(/\/scrape/, (msg) => this.handleScrapeMenu(msg));
+    this.bot.onText(/\/scrapeconfig/, (msg) => this.handleScrapeConfig(msg));
 
     this.bot.on('message', (msg) => {
       if (msg.text && msg.text.startsWith('/')) return;
@@ -112,6 +115,15 @@ class TelegramBotHandler {
         } else if (data.startsWith('menu_')) {
           const menu = data.split('_')[1];
           this.handleMenuCallback(chatId, menu);
+        } else if (data === 'scrape_all') {
+          this.executeScrape(chatId);
+        } else if (data.startsWith('scrape_')) {
+          const pasaran = data.split('_')[1];
+          this.executeScrape(chatId, pasaran);
+        } else if (data === 'scrape_status') {
+          this.handleScrapeConfig(msg);
+        } else if (data === 'main_menu') {
+          this.handleMenu(msg);
         } else if (data === 'cancel') {
           this.bot.sendMessage(chatId, '❌ Operasi dibatalkan.');
         }
@@ -209,6 +221,10 @@ Gunakan /menu untuk akses cepat semua fitur!
 /addadmin <user_id> - Tambah admin
 /removeadmin <user_id> - Hapus admin
 /admins - Lihat daftar admin
+
+*🌐 WEB SCRAPER* (Admin Only)
+/scrape - Auto update data dari website
+/scrapeconfig - Lihat konfigurasi URL
 
 *💡 TIPS:*
 • Min 10 data untuk akurasi baik
@@ -1070,10 +1086,170 @@ Total Verified: ${winRate.total} prediksi
     return map[confidence] || '⚪';
   }
 
+  async handleScrapeMenu(msg) {
+    const chatId = msg.chat.id;
+
+    if (!storage.isAdmin(chatId)) {
+      this.bot.sendMessage(chatId, '❌ *Akses Ditolak!*\n\nHanya admin yang bisa menggunakan scraper.', { parse_mode: 'Markdown' });
+      return;
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '🌐 Scrape Semua Pasaran', callback_data: 'scrape_all' }],
+        [
+          { text: '🇸🇬 Scrape SGP', callback_data: 'scrape_SGP' },
+          { text: '🇭🇰 Scrape HK', callback_data: 'scrape_HK' }
+        ],
+        [{ text: '🇦🇺 Scrape SDY', callback_data: 'scrape_SDY' }],
+        [{ text: '⚙️ Lihat Konfigurasi', callback_data: 'scrape_status' }],
+        [{ text: '🔙 Menu Utama', callback_data: 'main_menu' }]
+      ]
+    };
+
+    const message = '🌐 *WEB SCRAPER*\n' +
+      '━━━━━━━━━━━━━━━━━━━━\n\n' +
+      'Scraper akan otomatis mengambil data dari website dan update database.\n\n' +
+      '*Fitur:*\n' +
+      '• Auto-deteksi data baru\n' +
+      '• Skip duplikat otomatis\n' +
+      '• Support SGP, HK, SDY\n\n' +
+      'Pilih aksi:';
+
+    this.bot.sendMessage(chatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
+  }
+
+  async handleScrapeConfig(msg) {
+    const chatId = msg.chat.id;
+
+    if (!storage.isAdmin(chatId)) {
+      this.bot.sendMessage(chatId, '❌ *Akses Ditolak!*\n\nHanya admin yang bisa melihat konfigurasi scraper.', { parse_mode: 'Markdown' });
+      return;
+    }
+
+    const status = ScraperService.getScraperStatus();
+
+    let message = '⚙️ *KONFIGURASI SCRAPER*\n';
+    message += '━━━━━━━━━━━━━━━━━━━━\n\n';
+
+    for (const [pasaran, info] of Object.entries(status)) {
+      const emoji = info.configured ? '✅' : '❌';
+      message += `${emoji} *${pasaran}* - ${info.name}\n`;
+      if (info.configured) {
+        message += `   URL: \`${info.url}\`\n`;
+        if (info.offDays && info.offDays.length > 0) {
+          const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+          const offDayNames = info.offDays.map(d => days[d]).join(', ');
+          message += `   Off Days: ${offDayNames}\n`;
+        }
+      } else {
+        message += `   ⚠️ URL belum dikonfigurasi\n`;
+      }
+      message += '\n';
+    }
+
+    message += '━━━━━━━━━━━━━━━━━━━━\n';
+    message += '*Note:* URL disimpan di `config/scraper_config.json`\n';
+    message += 'Edit file tersebut jika URL berubah.';
+
+    this.bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+  }
+
+  async executeScrape(chatId, pasaran = null) {
+    const loadingMsg = await this.bot.sendMessage(chatId, '⏳ Scraping data...');
+
+    try {
+      let result;
+      
+      if (pasaran) {
+        const config = ScraperService.getConfig();
+        const url = config.urls[pasaran];
+        
+        if (!url) {
+          this.bot.editMessageText(`❌ URL untuk ${pasaran} belum dikonfigurasi!`, {
+            chat_id: chatId,
+            message_id: loadingMsg.message_id
+          });
+          return;
+        }
+
+        result = await ScraperService.scrapeTogelData(url, pasaran);
+        
+        if (result.success && result.data.length > 0) {
+          const importResult = storage.importScrapedData(result.data);
+          
+          let message = `✅ *SCRAPING ${pasaran} SELESAI!*\n`;
+          message += '━━━━━━━━━━━━━━━━━━━━\n\n';
+          message += `📊 Data ditemukan: ${result.count}\n`;
+          message += `✨ Data baru: ${importResult.newCount}\n`;
+          message += `♻️ Duplikat (skip): ${importResult.duplicateCount}\n\n`;
+          
+          if (importResult.newCount > 0) {
+            message += '*Preview data baru:*\n';
+            importResult.imported.slice(0, 3).forEach(item => {
+              const date = new Date(item.date).toLocaleDateString('id-ID');
+              message += `• ${date}: ${item.result}\n`;
+            });
+          }
+
+          this.bot.editMessageText(message, {
+            chat_id: chatId,
+            message_id: loadingMsg.message_id,
+            parse_mode: 'Markdown'
+          });
+        } else {
+          this.bot.editMessageText(`⚠️ Tidak ada data ditemukan untuk ${pasaran}\n\nError: ${result.error || 'Unknown'}`, {
+            chat_id: chatId,
+            message_id: loadingMsg.message_id
+          });
+        }
+      } else {
+        result = await ScraperService.scrapeAll();
+        
+        let message = '✅ *SCRAPING SEMUA PASARAN SELESAI!*\n';
+        message += '━━━━━━━━━━━━━━━━━━━━\n\n';
+
+        let totalNew = 0;
+        let totalDup = 0;
+
+        for (const [pasaran, res] of Object.entries(result.results)) {
+          if (res.success && res.data.length > 0) {
+            const importResult = storage.importScrapedData(res.data);
+            totalNew += importResult.newCount;
+            totalDup += importResult.duplicateCount;
+
+            const emoji = importResult.newCount > 0 ? '✨' : '♻️';
+            message += `${emoji} *${pasaran}*: ${importResult.newCount} baru, ${importResult.duplicateCount} skip\n`;
+          } else {
+            message += `❌ *${pasaran}*: ${res.error || 'Gagal'}\n`;
+          }
+        }
+
+        message += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+        message += `📊 Total data baru: ${totalNew}\n`;
+        message += `♻️ Total duplikat: ${totalDup}`;
+
+        this.bot.editMessageText(message, {
+          chat_id: chatId,
+          message_id: loadingMsg.message_id,
+          parse_mode: 'Markdown'
+        });
+      }
+    } catch (error) {
+      this.bot.editMessageText(`❌ Error saat scraping:\n\n${error.message}`, {
+        chat_id: chatId,
+        message_id: loadingMsg.message_id
+      });
+    }
+  }
+
   start() {
     console.log('🤖 Togel Prediction Bot V2 is running...');
     console.log(`📍 Pasaran: ${config.app.supportedPasaran.join(', ')}`);
-    console.log(`✨ Features: Prediction, Backtest, Win Rate, Scheduler, Export\n`);
+    console.log(`✨ Features: Prediction, Backtest, Win Rate, Scheduler, Export, Auto-Scraper\n`);
   }
 
   stop() {

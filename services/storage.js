@@ -114,6 +114,57 @@ class StorageService {
     return this.saveData();
   }
 
+  importScrapedData(scrapedResults) {
+    let newCount = 0;
+    let duplicateCount = 0;
+    const imported = [];
+
+    scrapedResults.forEach(item => {
+      const normalizedResult = this.normalizeResult(item.result);
+      const normalizedPasaran = item.pasaran.toUpperCase();
+      const date = new Date(item.date);
+      const targetDate = date.toISOString().split('T')[0];
+
+      const duplicate = this.data.history.find(h =>
+        h.pasaran === normalizedPasaran &&
+        h.result === normalizedResult &&
+        h.date.startsWith(targetDate)
+      );
+
+      if (!duplicate) {
+        const entry = {
+          pasaran: normalizedPasaran,
+          date: date.toISOString(),
+          result: normalizedResult
+        };
+        this.data.history.push(entry);
+        imported.push(entry);
+        newCount++;
+      } else {
+        duplicateCount++;
+      }
+    });
+
+    if (newCount > 0) {
+      this.data.history.sort((a, b) => {
+        if (a.pasaran !== b.pasaran) {
+          return a.pasaran.localeCompare(b.pasaran);
+        }
+        return new Date(a.date) - new Date(b.date);
+      });
+
+      this.saveData();
+    }
+
+    return {
+      success: newCount > 0,
+      newCount,
+      duplicateCount,
+      totalProcessed: scrapedResults.length,
+      imported
+    };
+  }
+
   cleanOldData(pasaran) {
     const maxResults = 16;
     const pasaranHistory = this.data.history.filter(h => h.pasaran === pasaran);

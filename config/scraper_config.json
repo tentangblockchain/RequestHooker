@@ -1,0 +1,25 @@
+{
+  "urls": {
+    "SGP": "https://masteralui.com/wap/pasaran/wve1p8pn.html",
+    "HK": "https://masteralui.com/wap/pasaran/2bfe00c2.html",
+    "SDY": "https://masteralui.com/wap/pasaran/c9740506.html"
+  },
+  "schedules": {
+    "SGP": {
+      "name": "Singapore (Selasa Jumat OFF)",
+      "offDays": [2, 5]
+    },
+    "HK": {
+      "name": "Hong Kong Lotto (Setiap Hari)",
+      "offDays": []
+    },
+    "SDY": {
+      "name": "Sydney (Setiap Hari)",
+      "offDays": []
+    }
+  },
+  "autoScrape": {
+    "enabled": true,
+    "schedule": "0 */6 * * *"
+  }
+}
