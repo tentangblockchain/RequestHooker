@@ -2,6 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
+const puppeteer = require('puppeteer');
 
 class ScraperService {
   static getConfig() {
@@ -19,36 +20,43 @@ class ScraperService {
   }
 
   static async scrapeTogelData(url, pasaran) {
+    let browser;
     try {
       console.log(`   📍 Scraping ${url}...`);
       
-      const response = await axios.get(url, {
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Accept-Encoding': 'gzip, deflate',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1'
-        },
-        maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 500
+      // Launch headless browser
+      browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu'
+        ]
       });
 
-      if (response.status === 403) {
-        console.log(`   ❌ Access forbidden (403)`);
-        throw new Error('Access forbidden (403)');
-      }
+      const page = await browser.newPage();
+      
+      // Set realistic viewport and user agent
+      await page.setViewport({ width: 1920, height: 1080 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
+      // Navigate to page
+      console.log(`   ⏳ Loading page...`);
+      await page.goto(url, { 
+        waitUntil: 'networkidle2',
+        timeout: 30000 
+      });
 
-      if (response.status !== 200) {
-        console.log(`   ⚠️  HTTP ${response.status}: ${response.statusText}`);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      // Wait for table to load
+      await page.waitForSelector('table.theTable', { timeout: 10000 });
+      
+      console.log(`   ✅ Page loaded successfully`);
 
-      console.log(`   ✅ Response OK (${response.status})`);
-
-      const $ = cheerio.load(response.data);
+      // Get HTML content
+      const html = await page.content();
+      const $ = cheerio.load(html);
       const results = [];
 
       // Parse table dengan class "table table-bordered theTable legend"
@@ -87,12 +95,17 @@ class ScraperService {
       };
 
     } catch (error) {
+      console.log(`   ❌ Error: ${error.message}`);
       return {
         success: false,
         pasaran,
         error: error.message,
         data: []
       };
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
     }
   }
 
