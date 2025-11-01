@@ -51,6 +51,12 @@ class TelegramBotHandler {
     this.bot.on('message', (msg) => {
       if (msg.text && msg.text.startsWith('/')) return;
 
+      // Handle reply keyboard buttons
+      if (msg.text === '📱 Menu') {
+        this.handleMenu(msg);
+        return;
+      }
+
       if (msg.text || msg.caption) {
         this.handleForwardedMessage(msg);
       }
@@ -62,10 +68,15 @@ class TelegramBotHandler {
   }
 
   setupCallbacks() {
-    this.bot.on('callback_query', (query) => {
+    this.bot.on('callback_query', async (query) => {
       const data = query.data;
       const msg = query.message;
       const chatId = msg.chat.id;
+
+      // Answer callback query immediately to remove loading state
+      await this.bot.answerCallbackQuery(query.id).catch(err => {
+        console.error('Error answering callback:', err.message);
+      });
 
       try {
         if (data.startsWith('pred_')) {
@@ -85,13 +96,13 @@ class TelegramBotHandler {
         } else if (data.startsWith('btestmenu_')) {
           const pasaran = data.split('_')[1];
           const keyboard = KeyboardHelper.getBacktestSizeKeyboard(pasaran);
-          this.bot.sendMessage(chatId, `🎯 Pilih ukuran backtest untuk ${pasaran}:`, {
+          await this.bot.sendMessage(chatId, `🎯 Pilih ukuran backtest untuk ${pasaran}:`, {
             reply_markup: keyboard
           });
         } else if (data.startsWith('schedmenu_')) {
           const pasaran = data.split('_')[1];
           const keyboard = KeyboardHelper.getScheduleTimeKeyboard(pasaran);
-          this.bot.sendMessage(chatId, `⏰ Pilih waktu auto prediksi untuk ${pasaran}:`, {
+          await this.bot.sendMessage(chatId, `⏰ Pilih waktu auto prediksi untuk ${pasaran}:`, {
             reply_markup: keyboard
           });
         } else if (data.startsWith('winr_')) {
@@ -126,16 +137,13 @@ class TelegramBotHandler {
         } else if (data === 'main_menu') {
           this.handleMenu(msg);
         } else if (data === 'cancel') {
-          this.bot.sendMessage(chatId, '❌ Operasi dibatalkan.');
+          await this.bot.sendMessage(chatId, '❌ Operasi dibatalkan.');
         }
       } catch (error) {
         console.error('❌ Callback error:', error.message);
-        this.bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.');
+        console.error('Stack:', error.stack);
+        await this.bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi.').catch(() => {});
       }
-
-      this.bot.answerCallbackQuery(query.id).catch(err => {
-        console.error('Error answering callback:', err.message);
-      });
     });
   }
 
@@ -176,7 +184,11 @@ Gunakan /menu untuk akses cepat semua fitur!
 ⚠️ _Prediksi untuk referensi. Main bijak!_
     `;
 
-    this.bot.sendMessage(chatId, welcomeMsg, { parse_mode: 'Markdown' });
+    const keyboard = KeyboardHelper.getReplyKeyboard();
+    this.bot.sendMessage(chatId, welcomeMsg, { 
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
   }
 
   handleHelp(msg) {

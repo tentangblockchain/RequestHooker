@@ -35,6 +35,18 @@ class KeyboardHelper {
     };
   }
 
+  static getReplyKeyboard() {
+    return {
+      keyboard: [
+        [
+          { text: '📱 Menu' }
+        ]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
+    };
+  }
+
   static getScheduleTimeKeyboard(pasaran) {
     return {
       inline_keyboard: [
