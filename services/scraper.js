@@ -17,14 +17,80 @@ class ScraperService {
       };
     }
   }
+
   static async scrapeTogelData(url, pasaran) {
     try {
-      const response = await axios.get(url, {
-        timeout: 10000,
+      // First request to get session cookie
+      const baseUrl = new URL(url).origin;
+      const listPage = `${baseUrl}/wap/pasaran.html`;
+      
+      const sessionResponse = await axios.get(listPage, {
+        timeout: 15000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept-Language': 'id,en-US;q=0.9,en;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Connection': 'keep-alive',
+          'Cache-Control': 'max-age=0',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'sec-ch-ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'Priority': 'u=0, i'
+        },
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 500
+      }).catch(() => null);
+
+      // Extract cookies
+      let cookies = '';
+      if (sessionResponse && sessionResponse.headers['set-cookie']) {
+        cookies = sessionResponse.headers['set-cookie']
+          .map(cookie => cookie.split(';')[0])
+          .join('; ');
+      }
+
+      // Add delay to simulate human behavior
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Main request with session
+      const response = await axios.get(url, {
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept-Language': 'id,en-US;q=0.9,en;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Connection': 'keep-alive',
+          'Cache-Control': 'max-age=0',
+          'Referer': listPage,
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'same-origin',
+          'Sec-Fetch-User': '?1',
+          'sec-ch-ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'Priority': 'u=0, i',
+          'Cookie': cookies
+        },
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 500
       });
+
+      if (response.status === 403) {
+        throw new Error('Cloudflare block. Website terlalu ketat proteksinya.');
+      }
+
+      if (response.status !== 200) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       const $ = cheerio.load(response.data);
       const results = [];
@@ -93,16 +159,20 @@ class ScraperService {
     const urls = config.urls || {};
 
     const results = {};
-    const promises = [];
 
+    // Scrape one by one with delay to avoid rate limiting
     for (const [pasaran, url] of Object.entries(urls)) {
       if (url && url !== '') {
-        promises.push(
-          this.scrapeTogelData(url, pasaran)
-            .then(result => {
-              results[pasaran] = result;
-            })
-        );
+        console.log(`🔄 Scraping ${pasaran}...`);
+        const result = await this.scrapeTogelData(url, pasaran);
+        results[pasaran] = result;
+        
+        // Add 3 second delay between requests
+        const pasaranKeys = Object.keys(urls);
+        if (pasaranKeys.indexOf(pasaran) < pasaranKeys.length - 1) {
+          console.log(`⏳ Waiting 3 seconds before next scrape...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
       } else {
         results[pasaran] = {
           success: false,
@@ -112,8 +182,6 @@ class ScraperService {
         };
       }
     }
-
-    await Promise.all(promises);
 
     const totalSuccess = Object.values(results).filter(r => r.success).length;
     const totalData = Object.values(results).reduce((sum, r) => sum + r.count, 0);
