@@ -219,6 +219,20 @@ class StorageService {
     
     this.data.predictions.push(entry);
     
+    // Clean old predictions - keep only last 30 per pasaran
+    const maxPredictions = 30;
+    const pasaranPredictions = this.data.predictions.filter(p => p.pasaran === pasaran.toUpperCase());
+    if (pasaranPredictions.length > maxPredictions) {
+      // Sort by date
+      pasaranPredictions.sort((a, b) => new Date(a.date) - new Date(b.date));
+      // Get oldest entries to remove
+      const toRemove = pasaranPredictions.slice(0, pasaranPredictions.length - maxPredictions);
+      // Remove old entries
+      this.data.predictions = this.data.predictions.filter(p => 
+        !toRemove.some(r => r.pasaran === p.pasaran && r.date === p.date)
+      );
+    }
+    
     this.data.predictionTracking.push({
       pasaran: pasaran.toUpperCase(),
       date: new Date().toISOString(),
@@ -234,6 +248,17 @@ class StorageService {
       actual: null,
       verified: false
     });
+    
+    // Clean old prediction tracking - keep only last 50 per pasaran
+    const maxTracking = 50;
+    const pasaranTracking = this.data.predictionTracking.filter(p => p.pasaran === pasaran.toUpperCase());
+    if (pasaranTracking.length > maxTracking) {
+      pasaranTracking.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const toRemove = pasaranTracking.slice(0, pasaranTracking.length - maxTracking);
+      this.data.predictionTracking = this.data.predictionTracking.filter(p => 
+        !toRemove.some(r => r.pasaran === p.pasaran && r.date === p.date)
+      );
+    }
     
     return this.saveData();
   }

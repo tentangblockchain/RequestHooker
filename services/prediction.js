@@ -174,27 +174,39 @@ class PredictionEngine {
       scores[i] = 0;
     }
 
+    // 1. Hot/Cold frequency (40% weight) - Increased from 35%
     Object.entries(hotCold.frequency).forEach(([digit, freq]) => {
-      scores[digit] = (scores[digit] || 0) + (freq * 0.35);
+      scores[digit] = (scores[digit] || 0) + (freq * 0.40);
     });
 
+    // 2. Ensemble prediction from all positions (35% weight) - Decreased from 40%
     for (let pos = 0; pos < 4; pos++) {
       const ensemble = StatisticsEngine.weightedEnsemblePrediction(history, pos);
       ensemble.forEach((d, idx) => {
-        const rankWeight = (4 - idx) / 10;
-        scores[d] = (scores[d] || 0) + (rankWeight * 0.40);
+        const rankWeight = (5 - idx) / 15; // Improved rank weight
+        scores[d] = (scores[d] || 0) + (rankWeight * 0.35);
       });
     }
 
+    // 3. Consecutive patterns (10% weight) - Decreased from 15%
     const consecutive = StatisticsEngine.findConsecutivePatterns(history);
     consecutive.forEach(d => {
-      scores[d] = (scores[d] || 0) + 0.15;
-    });
-
-    const lastDigits = lastResult.toString().split('').map(Number);
-    lastDigits.forEach(d => {
       scores[d] = (scores[d] || 0) + 0.10;
     });
+
+    // 4. Recent results (15% weight) - Increased from 10%
+    // Include last 2 results instead of just 1
+    const recentSize = Math.min(2, history.length);
+    for (let i = 0; i < recentSize; i++) {
+      const result = history[history.length - 1 - i];
+      if (result && result.result) {
+        const digits = result.result.toString().padStart(4, '0').split('').map(Number);
+        const weight = 0.15 / recentSize; // Distribute weight across recent results
+        digits.forEach(d => {
+          scores[d] = (scores[d] || 0) + weight;
+        });
+      }
+    }
 
     return Object.entries(scores)
       .sort((a, b) => b[1] - a[1])

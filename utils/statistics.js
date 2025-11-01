@@ -278,11 +278,12 @@ class StatisticsEngine {
 
   static weightedEnsemblePrediction(history, position, methodWeights = null) {
     if (!methodWeights) {
+      // Improved weights based on empirical testing
       methodWeights = {
-        secondOrderMarkov: 0.35,
-        markov: 0.25,
-        decay: 0.25,
-        probability: 0.15
+        secondOrderMarkov: 0.30,  // Slightly reduced
+        markov: 0.30,             // Increased from 0.25
+        decay: 0.25,              // Keep same
+        probability: 0.15         // Keep same
       };
     }
 

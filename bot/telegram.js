@@ -16,6 +16,7 @@ class TelegramBotHandler {
     this.setupCommands();
     this.setupCallbacks();
     this.startScheduler();
+    this.autoScrapeOnStartup();
   }
 
   startScheduler() {
@@ -1243,6 +1244,40 @@ Total Verified: ${winRate.total} prediksi
         chat_id: chatId,
         message_id: loadingMsg.message_id
       });
+    }
+  }
+
+  async autoScrapeOnStartup() {
+    const scraperConfig = ScraperService.getConfig();
+    
+    if (!scraperConfig.autoScrape || !scraperConfig.autoScrape.enabled) {
+      console.log('⏭️  Auto-scrape disabled in config\n');
+      return;
+    }
+
+    console.log('🔄 Auto-scraping data on startup...\n');
+    
+    try {
+      const result = await ScraperService.scrapeAll();
+      
+      let totalNew = 0;
+      let totalData = 0;
+      
+      for (const [pasaran, res] of Object.entries(result.results)) {
+        if (res.success && res.data.length > 0) {
+          const importResult = storage.importScrapedData(res.data);
+          totalNew += importResult.newCount;
+          totalData += res.count;
+          
+          console.log(`   ✅ ${pasaran}: ${importResult.newCount} data baru dari ${res.count} hasil scrape`);
+        } else {
+          console.log(`   ❌ ${pasaran}: ${res.error || 'Gagal scrape'}`);
+        }
+      }
+      
+      console.log(`\n📊 Total: ${totalNew} data baru ditambahkan dari ${totalData} hasil scrape\n`);
+    } catch (error) {
+      console.error('❌ Auto-scrape error:', error.message);
     }
   }
 
