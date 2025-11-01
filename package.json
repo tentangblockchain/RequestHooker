@@ -1,0 +1,25 @@
+{
+  "name": "togel-telegram-bot",
+  "version": "2.0.0",
+  "description": "Telegram Bot untuk Prediksi Togel dengan Analisis Akurat",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "bot": "node bot.js"
+  },
+  "keywords": [
+    "togel",
+    "prediction",
+    "telegram-bot",
+    "ai",
+    "statistics"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "lodash": "^4.17.21",
+    "node-cron": "^3.0.3",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
