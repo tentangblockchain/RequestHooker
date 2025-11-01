@@ -56,17 +56,21 @@ class ScraperService {
         const tds = $(element).find('td');
         
         // Format: Periode | Hari | Tanggal | Nomor | Nomor 2 | Nomor 3
+        // Index: 0=Periode, 1=Hari, 2=Tanggal, 3=Nomor (4D utama)
         if (tds.length >= 4) {
           const periode = $(tds[0]).text().trim();
           const hari = $(tds[1]).text().trim();
-          const tanggal = $(tds[2]).text().trim();
-          const nomor = $(tds[3]).text().trim();
+          const tanggalRaw = $(tds[2]).text().trim(); // "2025-10-31 | 23:18:13"
+          const nomor = $(tds[3]).text().trim(); // "2624"
 
-          // Ambil nomor 4 digit
+          // Extract tanggal saja (YYYY-MM-DD) dari format "2025-10-31 | 23:18:13"
+          const tanggal = tanggalRaw.split('|')[0].trim(); // "2025-10-31"
+          
+          // Validasi nomor 4 digit
           if (nomor && nomor.length === 4 && /^\d{4}$/.test(nomor)) {
             results.push({
               pasaran: pasaran.toUpperCase(),
-              date: this.parseVespaDate(tanggal),
+              date: new Date(tanggal).toISOString(), // Parse langsung dari YYYY-MM-DD
               result: nomor,
               periode: periode,
               hari: hari
